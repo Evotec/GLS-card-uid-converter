@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UID Converter</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; max-width: 860px; }
+    h1 { font-size: 22px; }
+    label { display: block; margin-top: 14px; font-weight: bold; }
+    input { width: 100%; max-width: 420px; padding: 9px; font-size: 16px; box-sizing: border-box; }
+    button { margin-top: 14px; padding: 10px 14px; font-size: 15px; cursor: pointer; }
+    table { border-collapse: collapse; margin-top: 18px; width: 100%; max-width: 760px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f1f1f1; }
+    .hint { color: #555; font-size: 14px; margin-top: 8px; }
+    .error { color: #b00020; font-weight: bold; margin-top: 14px; }
+    code { background: #f5f5f5; padding: 2px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>UID Converter</h1>
+
+  <p>
+    Indtast UID i HEX, f.eks. <code>DAB55246</code>, eller decimal/HEX,
+    f.eks. <code>1179825626</code> eller <code>4652B5DA</code>.
+  </p>
+
+  <label for="inputValue">Kort UID / værdi</label>
+  <input id="inputValue" value="DAB55246" oninput="convert()" placeholder="DAB55246 eller 1179825626">
+
+  <div class="hint">
+    Tip: Hvis NFC-app viser <code>DAB55246</code>, så er den byte-vendte værdi <code>4652B5DA</code>.
+  </div>
+
+  <button onclick="convert()">Konverter</button>
+
+  <div id="error" class="error"></div>
+  <div id="result"></div>
+
+<script>
+function cleanInput(s) {
+  return s.trim().replace(/^0x/i, '').replace(/\s+/g, '').replace(/-/g, '').replace(/:/g, '');
+}
+
+function toHex32(n) {
+  return (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+}
+
+function reverseBytes32(n) {
+  return (
+    ((n & 0x000000FF) << 24) |
+    ((n & 0x0000FF00) << 8) |
+    ((n & 0x00FF0000) >>> 8) |
+    ((n & 0xFF000000) >>> 24)
+  ) >>> 0;
+}
+
+function parseValue(s) {
+  const raw = cleanInput(s);
+  if (!raw) throw new Error('Indtast en værdi.');
+
+  if (/[A-Fa-f]/.test(raw)) {
+    if (!/^[0-9A-Fa-f]+$/.test(raw)) throw new Error('HEX må kun indeholde 0-9 og A-F.');
+    let hex = raw;
+    if (hex.length > 8) {
+      // Brug sidste 4 bytes/8 hex-tegn, f.eks. 0000DAB55246 -> DAB55246
+      hex = hex.slice(-8);
+    }
+    return parseInt(hex, 16) >>> 0;
+  }
+
+  // Kun tal: hvis præcis 8 tegn, kan det være HEX uden A-F. Ellers decimal.
+  if (/^\d+$/.test(raw)) {
+    if (raw.length === 8) {
+      return parseInt(raw, 16) >>> 0;
+    }
+    return Number(raw) >>> 0;
+  }
+
+  throw new Error('Ugyldigt input.');
+}
+
+function convert() {
+  const error = document.getElementById('error');
+  const result = document.getElementById('result');
+  error.textContent = '';
+  result.innerHTML = '';
+
+  try {
+    const input = document.getElementById('inputValue').value;
+    const uid = parseValue(input);
+    const uidHex = toHex32(uid);
+    const reversed = reverseBytes32(uid);
+    const reversedHex = toHex32(reversed);
+
+    result.innerHTML = `
+      <table>
+        <tr><th>Felt</th><th>Værdi</th></tr>
+        <tr><td>UID HEX</td><td><code>${uidHex}</code></td></tr>
+        <tr><td>UID decimal</td><td><code>${uid >>> 0}</code></td></tr>
+        <tr><td>Reversed UID HEX</td><td><code>${reversedHex}</code></td></tr>
+        <tr><td>Reversed UID decimal</td><td><code>${reversed >>> 0}</code></td></tr>
+      </table>
+
+      <p class="hint">
+        Formel: byte-reverse UID → reversed UID-værdi.<br>
+        Eksempel: <code>DAB55246</code> → <code>4652B5DA</code>.
+      </p>
+    `;
+  } catch (e) {
+    error.textContent = e.message;
+  }
+}
+
+convert();
+</script>
+</body>
+</html>
